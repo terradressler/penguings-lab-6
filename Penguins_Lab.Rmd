@@ -1,0 +1,90 @@
+---
+title: "Penguin Flipper Length ANOVA"
+author: "Terra Dressler"
+date: "November 7, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=FALSE}
+library(tidyverse)
+library(car)
+library(onewaytests)
+
+penguins <- read_csv("penguins.csv")
+
+
+```
+Our question: Is there a significant difference in mean flipper lengths for female Chinstrap, Gentoo, and Adelie penguins near Palmer Archipelago?
+
+Maybe I can use a one-way ANOVA...
+-independnet onservations
+-equal variance (Levene's test)
+-normality (histograms/qqplots)
+
+```{r}
+counts <- with(penguins, table(species, sex))
+
+penguins2 <- penguins %>% 
+  mutate(common_name = case_when(species == "Chinstrap penguin (Pygoscelis antarctica)
+" ~ "Chinstrap", species == "Gentoo penguin (Pygoscelis papua)" ~ "Gentoo", species == "Adelie Penguin (Pygoscelis adeliae)" ~ "Adelie")) %>% 
+  filter(sex == "FEMALE")
+
+
+
+
+```
+Exploratory graphs and Levene's test for equal variances
+```{r}
+hists <- ggplot(penguins2, aes(x= flipper_length))+ geom_histogram(aes(fill = "common_name")) + facet_wrap(~common_name, scale = "free")
+
+hists
+
+qqs<- ggplot(penguins2, aes(sample = flipper_length)) + geom_qq(aes(color = "common_name")) + facet_wrap(~common_name, scale = "free")
+
+qqs
+
+#Based on qq plots and histograms, each group appears normally distributed. Also, n>30 for all groups, so means will be normally distributed by CLT.
+```
+
+Evaluate variances and prform a Levene's test for equal variances
+```{r}
+#If the largest sample vriances is <4x greater than the smallest sample variance, then these are "close enough" to consider variances equal.
+
+variances <- penguins2 %>% 
+  group_by(common_name) %>% 
+  summarize(variance = var(flipper_length))
+variances
+
+#The largest variance (33.1) is definitely not more than 4x greater than the smallest variance (15.2)
+#Levene's test
+#leveneTest function in the "car" package
+
+levene_penguin <-leveneTest(flipper_length ~ common_name, data = penguins2)
+levene_penguin
+
+#H0 no difference in variances
+#HA variances are not equal
+
+#There is no significant difference in variances across species.
+```
+One-way ANOVA for penguin flipper lengths by species (common_name)
+
+```{r}
+#H0 means across all groups are equal
+#HA at least 2 group means differ significantly 
+
+penguin_aov <- aov(flipper_length ~ common_name, data = penguins2)
+summary(penguin_aov)
+
+#Post-hoc testing by Tukey's HSD
+
+penguin_ph <- TukeyHSD(penguin_aov)
+penguin_ph
+
+#aov test funtion does allow for in-line  references
+```
+Mean flipper lengths of feale penguins differed significantly for all secies studied (one-way anovam F(df)= statistic, p < 0.001, $\alpha$ = 0.05 with post-hoc Tukey's $\alpha$ = 0.05)
